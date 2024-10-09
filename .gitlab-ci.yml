@@ -1,0 +1,22 @@
+include: ".autodevops-template.yml"
+
+variables:
+  PROJECT_NAME: blockexplorer-production-client
+  MAX_MEM: "8Gi"
+  MAX_CPU: "4"
+  MEM: "8Gi"
+
+  APP_PORT: "4000" # Specify the main communication port to the App. This port will be used to determine if service is online. (default 5000)
+  INGRESS_PORT: "4000" # Specify the port exposed externally via nginx. Please set it accordingly  to avoid security exposure. (default none)
+  INTERNAL_PORTS: "" # Specify additional ports exposed to the cluster, separated by space. (default none)
+  EXTERNAL_PORTS: "" # Specify additional ports exposed to the world, separated by space. (default node)
+  # ADDITIONAL_HOSTS: "blockexplorer.bloxberg.org"
+  ADDITIONAL_HOSTS: "blockexplorer.bloxberg.org"
+  SKIP_TESTS: "yes"
+  LIVENESS_PROBE_INITIAL_DELAY: "900"
+  LIVENESS_PROBE_TIMEOUT: "30"
+
+  QA_IP:
+    141.5.104.73
+
+    # LIVENESS_COMMAND: "exit"

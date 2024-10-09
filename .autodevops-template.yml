@@ -1,0 +1,360 @@
+.auto-deploy:
+  image: "registry.gitlab.com/gitlab-org/cluster-integration/auto-deploy-image/v2-61-0:latest"
+
+
+    #image: "quay.io/buildah/stable:v1.23.1"
+image: "quay.io/buildah/stable"
+
+variables:
+  PROJECT_NAME: template
+  # persistent volume "name:mountpoint:space [...]"
+  PERSISTENT_VOLUMES: ""
+  # secrets "name:mountpoint [...]
+  SECRETS: ""
+  MAX_MEM: "1Gi"
+  MAX_CPU: "1"
+  
+  APP_PORT: "8545" # Specify the main communication port to the App. This port will be used to determine if service is online. (default 5000)     
+  INGRESS_PORT: "8545" # Specify the port exposed externally via nginx as a web app. (default 5000)
+  INTERNAL_PORTS: "8546" # Specify additional ports exposed to the cluster, separated by space. (default none)
+  EXTERNAL_PORTS: "30303" # Specify additional ports exposed to the world, separated by space. (default node)
+
+  LIVENESS_PATH: "/"
+  
+
+  POSTGRES_ENABLED: "false"
+  STORAGE_DRIVER: "overlay"
+  BUILDAH_FORMAT: "docker"
+  BUILDAH_ISOLATION: "chroot"
+  ROLLOUT_RESOURCE_TYPE: deployment
+  KUBE_INGRESS_BASE_DOMAIN: test.bloxberg.org
+  GIT_SUBMODULE_STRATEGY: recursive
+
+  REPLICA_COUNT: 1
+  INGRESS_CLASS_NAME: "traefik"
+
+  ADDITIONAL_HOSTS: ""
+  SKIP_STAGING: "true"
+  SKIP_TESTS: "true"
+
+
+  QA_TAG: k3s
+  TAG: k3s
+
+
+stages:
+  - publish
+  - staging
+  - qa
+  - production
+
+
+# REGISTRY
+1. registry:
+  stage: publish
+  tags:
+    - $TAG
+  script:
+    - bloxberg-pipeline-template/bin/publish
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH             # Execute jobs when a new commit is pushed to master branch
+
+
+# STAGING
+# $TAG
+1. unit test:
+  extends: .auto-deploy
+  stage: staging
+  tags: 
+    - $TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - auto-deploy create_secret
+    - bloxberg-pipeline-template/bin/test
+  environment:
+    name: $TAG/staging
+    url: https://$CI_PROJECT_PATH_SLUG.$TAG.$KUBE_INGRESS_BASE_DOMAIN
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule" && $SKIP_STAGING != "true" && $SKIP_TESTS != 'true'
+      when: on_success
+
+
+2. start stage:
+  extends: .auto-deploy
+  stage: staging
+  tags: 
+    - $TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - auto-deploy create_secret
+    - bloxberg-pipeline-template/bin/dns-record
+    - auto-deploy deploy
+
+  environment:
+    name: $TAG/staging
+    url: https://$CI_PROJECT_PATH_SLUG.$TAG.$KUBE_INGRESS_BASE_DOMAIN
+    on_stop: 3. stop stage
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule" && $SKIP_STAGING != "true"
+      when: manual
+
+
+3. stop stage:
+  extends: .auto-deploy
+  stage: staging
+  tags: 
+    - thoth
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy delete
+  environment:
+    name: $TAG/staging
+    action: stop
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule" && $SKIP_STAGING != "true"
+      when: manual
+
+
+# QA
+# $TAG
+1. integration test:
+  extends: .auto-deploy
+  stage: qa
+  tags: 
+    - $QA_TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - auto-deploy create_secret
+    - bloxberg-pipeline-template/bin/test
+  environment:
+    name: $QA_TAG/qa
+    url: https://$CI_PROJECT_PATH_SLUG.qa.$QA_TAG.$KUBE_INGRESS_BASE_DOMAIN
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule" && $SKIP_TESTS != 'true'
+      when: on_success
+
+
+2. start qa:
+  extends: .auto-deploy
+  stage: qa
+  tags: 
+    - $QA_TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - auto-deploy create_secret
+    - bloxberg-pipeline-template/bin/dns-record
+    - bloxberg-pipeline-template/bin/deploy
+  environment:
+    name: $QA_TAG/qa
+    url: https://$PROJECT_NAME.qa.$QA_TAG.$KUBE_INGRESS_BASE_DOMAIN
+    on_stop: 4. stop qa
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: on_success
+    - if: $SKIP_TESTS != "true"
+      needs: ["1. integration test"]
+      when: on_success
+
+
+3. end to end test:
+  extends: .auto-deploy
+  stage: qa
+  tags: 
+    - $QA_TAG
+  needs: 
+    - 2. start qa
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - auto-deploy create_secret
+    - bloxberg-pipeline-template/bin/test
+  environment:
+    name: $QA_TAG/qa
+    url: https://$CI_PROJECT_PATH_SLUG.qa.$QA_TAG.$KUBE_INGRESS_BASE_DOMAIN
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: on_success
+
+
+4. stop qa:
+  extends: .auto-deploy
+  stage: qa
+  tags: 
+    - $QA_TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy delete
+    - bloxberg-pipeline-template/bin/stop
+  environment:
+    name: $QA_TAG/qa
+    action: stop
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+5. get logs:
+  extends: .auto-deploy
+  stage: qa
+  tags: 
+    - $QA_TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - bloxberg-pipeline-template/bin/get-logs
+  environment:
+    name: $QA_TAG/qa
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+
+
+# PRODUCTION
+
+
+1. start prod:
+  extends: .auto-deploy
+  stage: production
+  tags:
+    - thoth
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - bloxberg-pipeline-template/bin/dns-record
+    - bloxberg-pipeline-template/bin/deploy
+  environment:
+    name: thoth/production
+    url: https://$PROJECT_NAME.prod.$KUBE_INGRESS_BASE_DOMAIN
+    on_stop: 3. stop prod
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+
+2. activate prod:
+  extends: .auto-deploy
+  stage: production
+  tags:
+    - thoth
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - bloxberg-pipeline-template/bin/dns-record
+  environment:
+    name: thoth/production
+    url: https://$PROJECT_NAME.prod.$KUBE_INGRESS_BASE_DOMAIN
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+
+3. stop prod:
+  extends: .auto-deploy
+  stage: production
+  tags: 
+    - thoth
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy delete
+    - bloxberg-pipeline-template/bin/stop
+  environment:
+    name: thoth/production
+    action: stop
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+
+4. start backup prod:
+  extends: .auto-deploy
+  stage: production
+  tags: 
+    - $TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy check_kube_domain
+    - auto-deploy download_chart
+    - auto-deploy ensure_namespace
+    - auto-deploy create_secret
+    - bloxberg-pipeline-template/bin/dns-record
+    - bloxberg-pipeline-template/bin/deploy
+  environment:
+    name: $TAG/production
+    url: https://$PROJECT_NAME.prod.$KUBE_INGRESS_BASE_DOMAIN
+    on_stop: 6. stop backup prod
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+5. activate backup prod:
+  extends: .auto-deploy
+  stage: production
+  tags:
+    - $TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - bloxberg-pipeline-template/bin/dns-record
+  environment:
+    name: $TAG/production
+    url: https://$PROJECT_NAME.prod.$KUBE_INGRESS_BASE_DOMAIN
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+6. stop backup prod:
+  extends: .auto-deploy
+  stage: production
+  tags: 
+    - $TAG
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - auto-deploy delete
+    - bloxberg-pipeline-template/bin/stop
+  environment:
+    name: $TAG/production
+    action: stop
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+
+7. get logs:
+  extends: .auto-deploy
+  stage: production
+  tags: 
+    - thoth
+  script:
+    - source bloxberg-pipeline-template/bin/set-env
+    - bloxberg-pipeline-template/bin/get-logs
+  environment:
+    name: thth/production
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      allow_failure: true
+

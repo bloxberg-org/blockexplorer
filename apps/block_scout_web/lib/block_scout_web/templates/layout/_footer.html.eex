@@ -1,0 +1,22 @@
+<footer class="footer">
+  <div class="footer-body container">
+    <!-- Logo -->
+    <div class="row footer-logo-row">
+      <div class="col-md-12">
+        <%= link to: webapp_url(@conn), class: "footer-brand" do %>
+          <%= if logo_footer() do %>
+            <img class="footer-logo" src="<%= static_path(@conn, logo_footer()) %>" alt="<%= subnetwork_title() %>" />
+          <% end %>
+          <%= if logo_text() do %>
+            <span class="logo-text in-footer <%= unless logo_footer(), do: "no-logo" %>"> <%= logo_text() %> </span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <div>
+       <p> &copy; <%= DateTime.utc_now.year %> <%= gettext "Blockexplorer version 3.0.0 based on " %> <a class="blockscout-link" href= "https://github.com/blockscout/blockscout/releases/tag/v5.2.2-beta">Blockscout 5.2.2</p>
+    </div>
+
+  </div>
+</footer>

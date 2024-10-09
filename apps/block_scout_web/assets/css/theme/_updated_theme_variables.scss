@@ -1,0 +1,102 @@
+// general
+$primary: #29404f;
+$secondary: #87e1a9;
+$tertiary: #2a5963;
+$quaternary: #e01d6c;
+$additional-font: #fff;
+
+// footer
+$footer-background-color: #1c2b36;
+$footer-title-color: #fff;
+$footer-text-color: #fff;
+$footer-item-disc-color: $secondary;
+.footer-logo {
+  filter: brightness(1) invert(0);
+}
+
+//overall stuff
+$background-color: #29404f;
+
+//transaction colors
+$transaction-color: #7ca9af;
+$contract-call-color: #1c2b36;
+$contract-creation-color: #e01d6c;
+$token-transfer-color: #e01d6c;
+$error-reason-color: #bad5d8;
+
+//api colors
+$rpc-api-get-color: #e01d6c;
+
+//alert colors
+$danger-color: #e01d6c;
+
+// dashboard
+$dashboard-line-color-price: $tertiary; // price left border
+
+$dashboard-banner-chart-legend-label-color: #fff;
+$dashboard-stats-item-label-color: $dashboard-banner-chart-legend-label-color;
+$dashboard-banner-chart-legend-value-color: #fff; // chart labels
+$dashboard-stats-item-value-color: #fff; // stat values
+
+$dashboard-stats-item-border-color: $secondary; // stat border
+
+$dashboard-banner-gradient-start: $primary; // gradient begin
+
+$dashboard-banner-gradient-end: lighten($primary, 5); // gradient end
+
+$dashboard-banner-network-plain-container-background-color: #2a5963; // stats bg
+
+// navigation
+.navbar {
+  box-shadow: none; //0px 0px 30px 0px rgba(21, 53, 80, 0.12);
+} // header shadow
+$dropdown-menu-item-hover-color: $primary !default;
+$dropdown-menu-item-hover-background: $primary !default; //rgba($primary, 0.1) !default;
+$header-icon-color-hover: $quaternary;
+$header-icon-border-color-hover: $quaternary;
+
+// buttons
+$btn-line-bg: #fff; // button bg
+$btn-line-color: $primary; // button border and font color && hover bg color
+$btn-copy-color: $primary; // btn copy
+$btn-qr-color: $primary; // btn qr-code
+$btn-address-card-icon-color: $primary; // btn address color
+
+//links & tile
+$tile-body-a-color: $primary;
+$tile-type-block-color: $primary;
+$tile-type-progress-bar-color: $primary;
+a.tile-title {
+  color: $primary !important;
+}
+
+// card
+$card-background-1: $primary;
+$card-tab-active: $primary;
+
+.layout-container {
+  .dashboard-banner-container {
+    background-image: linear-gradient(
+      to bottom,
+      $dashboard-banner-gradient-start,
+      $dashboard-banner-gradient-end
+    );
+  }
+}
+
+// Badges
+$badge-neutral-color: $primary;
+$badge-neutral-background-color: rgba($primary, 0.1);
+$api-text-monospace-color: $primary;
+
+// Tokens dropdown
+.token-balance-dropdown[aria-labelledby="dropdown-tokens"] {
+  .dropdown-items .dropdown-item:hover {
+    color: $primary !important;
+  }
+}
+
+// Dark theme
+$dark-primary: #133944;
+$dark-secondary: #87e1a9;
+$dark-primary-alternate: #1c2b36;
